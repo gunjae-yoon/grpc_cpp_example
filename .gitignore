@@ -1,0 +1,37 @@
+# Visual Studio
+**/.vs
+**/bin
+**/obj
+**/Release
+**/Debug
+**/x64
+**/x86
+*.user
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Temporary Files
+*.diff
+*.err
+*.log
+*.orig
+*.rej
+*.swo
+*.swp
+*.vi
+
+# Compressed Files
+*.zip
+*.rar
+*.gzip
+*.deb
+*.7z
+*.tar.gz
+*.xz
+*.alz
