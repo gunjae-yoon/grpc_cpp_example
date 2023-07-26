@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package grpc_cpp_example;
+
+enum FileStatus {
+	OK = 0;
+	DOES_NOT_EXIST = 1;
+	PERMISSION_DENIED = 2;	
+	ERROR = 3;
+}
+
+message StatRequest {
+	string command = 1;
+}
+
+message StatResponse {
+	string data = 1;
+}
+
+message FileRequest {
+	string name = 1;
+}
+
+message FileResponse {
+	FileStatus stat = 1;
+	bytes data = 2;
+}
+
+message PushMessage {
+	string data = 1;
+}
+
+service grpc_cpp_example_service {
+	rpc GetFile(FileRequest) returns (FileResponse);
+	rpc GetStat(StatRequest) returns (StatResponse);
+}
