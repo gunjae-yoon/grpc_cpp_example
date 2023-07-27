@@ -35,3 +35,10 @@
 *.tar.gz
 *.xz
 *.alz
+
+# Build
+build
+
+# Protocol Buffer
+**/*.pb.cc
+**/*.pb.h
