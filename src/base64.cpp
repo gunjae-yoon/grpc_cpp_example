@@ -5,46 +5,94 @@
 #include <fstream>
 
 namespace grpc_cpp_example {
-	std::string EncodeBase64(char* stream, uint64_t streamLength) {
-		static const char* base64EncodingTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-		uint8_t input[3] = {0, };
-		uint8_t output[4] = {0, };
-		uint64_t iInput = 0;
-		uint64_t iResult = 0;
-		char* cur = stream;
-		char* end = stream + streamLength - 1;
-		char* result = new char[(4 * (streamLength / 3)) + (streamLength % 3 ? 4 : 0) + 1];
 	
-		uint64_t counter = 0;	
-		while (cur <= end) {
-			// step 1. pre-processing
-			iInput = counter % 3;
-			input[iInput] = *(cur);
-			
-			// step 2. transformations
-			if ((iInput == 2) || (cur == end)) {
-				output[0] = ((input[0] & 0xfc) >> 2);
-				output[1] = ((input[0] & 0x3) << 4) | ((input[1] & 0xf0) >> 4);
-				output[2] = ((input[1] & 0xf) << 2) | ((input[2] & 0xc0) >> 6);
-				output[3] = (input[2] & 0x3f);
-				result[iResult++] = base64EncodingTable[output[0]];
-				result[iResult++] = base64EncodingTable[output[1]];
-				result[iResult++] = (iInput == 0 ? '=' : base64EncodingTable[output[2]]);
-				result[iResult++] = (iInput == 0 ? '=' : base64EncodingTable[output[3]]);
-				input[0] = 0;
-				input[1] = 0;
-				input[2] = 0;
-			}
-
-			// step 3. next turn 
-			counter++;
-			cur++;
+	void MakeBase64Chunk(std::string& base64, char b1, char b2, char b3) {
+		static const char* base64EncodingTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		uint32_t concatBits = ((b1 << 16) | (b2 << 8) | (b3));
+		char b64[4] = {};
+		b64[0] = base64EncodingTable[(concatBits >> 18) & 0b0011'1111];
+		b64[1] = base64EncodingTable[(concatBits >> 12) & 0b0011'1111];
+		if (b3 != 0) {
+			b64[2] = base64EncodingTable[(concatBits >> 6) & 0b0011'1111];
+			b64[3] = base64EncodingTable[(concatBits) & 0b0011'1111];
+		} else if (b2 != 0) {
+			b64[2] = base64EncodingTable[(concatBits >> 6) & 0b0011'1111];
+			b64[3] = '=';
+		} else {
+			b64[2] = '=';
+			b64[3] = '=';
 		}
-		result[iResult] = '\0';
 
-		std::string resultStr(result);
-		delete(result);
-		return resultStr;
+		std::copy(b64 + 0, b64 + 4, std::back_inserter(base64));
+	}
+	
+	std::string EncodeBase64Simple(char* stream, uint64_t streamLength) {
+		uint64_t tripples = streamLength / 3;
+		uint64_t remains = streamLength % 3;
+		
+		std::string result;
+		result.reserve((tripples + 2) * 4);
+		
+		char* cur = nullptr;
+		for (uint64_t i = 0; i < tripples; i++) {
+			cur = stream + (i * 3);
+			MakeBase64Chunk(result, cur[0], cur[1], cur[2]);
+		}
+		
+		cur = stream + (tripples * 3);
+		if (remains == 2) {
+			MakeBase64Chunk(result, cur[0], cur[1], 0);
+		} else if (remains == 1) {
+			MakeBase64Chunk(result, cur[0], 0, 0);
+		}
+		
+		return result;
+	}
+
+	std::string EncodeBase64Efficient(char* stream, uint64_t streamLength) {
+		static const char* base64EncodingTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		uint32_t concatBits = 0;
+		char b64[4] = {};
+
+		uint64_t tripples = streamLength / 3;
+		uint64_t remains = streamLength % 3;
+		
+		std::string result;
+		result.reserve((tripples + 2) * 4);
+		
+		char* cur = nullptr;
+		for (uint64_t i = 0; i < tripples; i++) {
+			cur = stream + (i * 3);
+			concatBits = ((cur[0] << 16) | (cur[1] << 8) | (cur[2]));
+			b64[0] = base64EncodingTable[(concatBits >> 18) & 0b0011'1111];
+			b64[1] = base64EncodingTable[(concatBits >> 12) & 0b0011'1111];
+			b64[2] = base64EncodingTable[(concatBits >> 6) & 0b0011'1111];
+			b64[3] = base64EncodingTable[(concatBits) & 0b0011'1111];
+			std::copy(b64 + 0, b64 + 4, std::back_inserter(result));
+		}
+		
+		cur = stream + (tripples * 3);
+		if (remains == 2) {
+			concatBits = ((cur[0] << 16) | (cur[1] << 8));
+			b64[0] = base64EncodingTable[(concatBits >> 18) & 0b0011'1111];
+			b64[1] = base64EncodingTable[(concatBits >> 12) & 0b0011'1111];
+			b64[2] = base64EncodingTable[(concatBits >> 6) & 0b0011'1111];
+			b64[3] = '=';
+			std::copy(b64 + 0, b64 + 4, std::back_inserter(result));
+		} else if (remains == 1) {
+			concatBits = (cur[0] << 16);
+			b64[0] = base64EncodingTable[(concatBits >> 18) & 0b0011'1111];
+			b64[1] = base64EncodingTable[(concatBits >> 12) & 0b0011'1111];
+			b64[2] = '=';
+			b64[3] = '=';
+			std::copy(b64 + 0, b64 + 4, std::back_inserter(result));
+		}
+		
+		return result;
+	}
+
+	std::string EncodeBase64(char* stream, uint64_t streamLength) {
+		return EncodeBase64Efficient(stream, streamLength);
 	}
 
 	uint64_t DecodeBase64(char* buffer, uint64_t bufferLength, char* base64Text, uint64_t base64TextLength) {
@@ -138,8 +186,12 @@ namespace grpc_cpp_example {
 		}
 
 		uint64_t last = base64.length() - 4;
-		uint64_t posPad = base64.find('=', last);
-		uint64_t padLength = (posPad == 0 ? 0 : posPad - last);
-		return ((base64.length() / 4) * 3) - padLength;
+		uint64_t padLength = 0;
+		std::string::reverse_iterator rit = base64.rbegin();
+		while (*(rit) == '=') {
+			padLength++;
+			rit++;
+		}
+		return ((base64.length() * 3) / 4) - padLength;
 	}
 }
