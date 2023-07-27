@@ -62,6 +62,9 @@ namespace grpc_cpp_example {
 		grpc::reflection::InitProtoReflectionServerBuilderPlugin();
 		grpc::ServerBuilder builder;
 
+		builder.SetMaxMessageSize(INT32_MAX);
+		builder.SetMaxSendMessageSize(INT32_MAX);
+		builder.SetMaxReceiveMessageSize(INT32_MAX);
 		builder.AddListeningPort(serverAddress, grpc::InsecureServerCredentials());
 		builder.RegisterService(&service);
 		std::unique_ptr<grpc::Server> server(builder.BuildAndStart());

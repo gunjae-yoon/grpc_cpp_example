@@ -68,6 +68,7 @@ namespace grpc_cpp_example {
 				
 				return response.stat();
 			} else {
+				std::cout << "grpc status: " << status.error_message() << std::endl;
 				return ERROR;
 			}
 		}
@@ -81,7 +82,12 @@ int main(int argc, char **argv) {
 	absl::ParseCommandLine(argc, argv);
 	std::string targetStr = absl::GetFlag(FLAGS_target);
 	std::string filenameStr = absl::GetFlag(FLAGS_filename);
-	grpc_cpp_example::ExampleClient client(grpc::CreateChannel(targetStr, grpc::InsecureChannelCredentials()));
+	
+	grpc::ChannelArguments args;
+	args.SetMaxSendMessageSize(-1);
+	args.SetMaxReceiveMessageSize(-1);
+	std::shared_ptr<grpc::Channel> channel = grpc::CreateCustomChannel(targetStr, grpc::InsecureChannelCredentials(), args);
+	grpc_cpp_example::ExampleClient client(channel);
 	grpc_cpp_example::FileStatus stat = client.requestFileStatus(filenameStr);
 
 	std::string base64 = grpc_cpp_example::EncodeBase64(filenameStr.c_str(), filenameStr.length());
