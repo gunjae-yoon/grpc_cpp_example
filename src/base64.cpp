@@ -49,7 +49,7 @@ namespace grpc_cpp_example {
 		return result;
 	}
 
-	std::string EncodeBase64Efficient(char* stream, uint64_t streamLength) {
+	std::string EncodeBase64WithCopy(char* stream, uint64_t streamLength) {
 		static const char* base64EncodingTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 		uint32_t concatBits = 0;
 		char b64[4] = {};
@@ -91,28 +91,106 @@ namespace grpc_cpp_example {
 		return result;
 	}
 
+	std::string EncodeBase64WithPush(char* stream, uint64_t streamLength) {
+		static const char* base64EncodingTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		uint32_t concatBits = 0;
+
+		uint64_t tripples = streamLength / 3;
+		uint64_t remains = streamLength % 3;
+		
+		std::string result;
+		result.reserve((tripples + 2) * 4);
+		
+		char* cur = nullptr;
+		for (uint64_t i = 0; i < tripples; i++) {
+			cur = stream + (i * 3);
+			concatBits = ((cur[0] << 16) | (cur[1] << 8) | (cur[2]));
+			result.push_back(base64EncodingTable[(concatBits >> 18) & 0b0011'1111]);
+			result.push_back(base64EncodingTable[(concatBits >> 12) & 0b0011'1111]);
+			result.push_back(base64EncodingTable[(concatBits >> 6) & 0b0011'1111]);
+			result.push_back(base64EncodingTable[(concatBits) & 0b0011'1111]);
+		}
+		
+		cur = stream + (tripples * 3);
+		if (remains == 2) {
+			concatBits = ((cur[0] << 16) | (cur[1] << 8));
+			result.push_back(base64EncodingTable[(concatBits >> 18) & 0b0011'1111]);
+			result.push_back(base64EncodingTable[(concatBits >> 12) & 0b0011'1111]);
+			result.push_back(base64EncodingTable[(concatBits >> 6) & 0b0011'1111]);
+			result.push_back('=');
+		} else if (remains == 1) {
+			concatBits = (cur[0] << 16);
+			result.push_back(base64EncodingTable[(concatBits >> 18) & 0b0011'1111]);
+			result.push_back(base64EncodingTable[(concatBits >> 12) & 0b0011'1111]);
+			result.push_back('=');
+			result.push_back('=');
+		}
+		
+		return result;
+	}
+
+	std::string EncodeBase64WithMem(char* stream, uint64_t streamLength) {
+		static const char* base64EncodingTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		uint32_t concatBits = 0;
+
+		uint64_t tripples = streamLength / 3;
+		uint64_t remains = streamLength % 3;
+		
+		char* mem = new char[(tripples + 2) * 4];
+		uint64_t memIdx = 0;
+		
+		char* cur = nullptr;
+		for (uint64_t i = 0; i < tripples; i++) {
+			cur = stream + (i * 3);
+			concatBits = ((cur[0] << 16) | (cur[1] << 8) | (cur[2]));
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 18) & 0b0011'1111]);
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 12) & 0b0011'1111]);
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 6) & 0b0011'1111]);
+			mem[memIdx++] = (base64EncodingTable[(concatBits) & 0b0011'1111]);
+		}
+		
+		cur = stream + (tripples * 3);
+		if (remains == 2) {
+			concatBits = ((cur[0] << 16) | (cur[1] << 8));
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 18) & 0b0011'1111]);
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 12) & 0b0011'1111]);
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 6) & 0b0011'1111]);
+			mem[memIdx++] = ('=');
+		} else if (remains == 1) {
+			concatBits = (cur[0] << 16);
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 18) & 0b0011'1111]);
+			mem[memIdx++] = (base64EncodingTable[(concatBits >> 12) & 0b0011'1111]);
+			mem[memIdx++] = ('=');
+			mem[memIdx++] = ('=');
+		}
+		
+		std::string result(mem);
+		delete(mem);
+		return result;
+	}
+
 	std::string EncodeBase64(char* stream, uint64_t streamLength) {
-		return EncodeBase64Efficient(stream, streamLength);
+		return EncodeBase64WithMem(stream, streamLength);
 	}
 
 	uint64_t DecodeBase64(char* buffer, uint64_t bufferLength, char* base64Text, uint64_t base64TextLength) {
 		static const char base64DecodingTable[256] = {
 			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 00-0F */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 10-1F */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,  /* 20-2F */
-    		52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,  /* 30-3F */
-    		-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,  /* 40-4F */
-    		15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,  /* 50-5F */
-    		-1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,  /* 60-6F */
-    		41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,  /* 70-7F */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 80-8F */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 90-9F */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* A0-AF */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* B0-BF */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* C0-CF */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* D0-DF */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* E0-EF */
-    		-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1   /* F0-FF */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 10-1F */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,  /* 20-2F */
+    			52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,  /* 30-3F */
+    			-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,  /* 40-4F */
+    			15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,  /* 50-5F */
+    			-1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,  /* 60-6F */
+    			41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,  /* 70-7F */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 80-8F */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 90-9F */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* A0-AF */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* B0-BF */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* C0-CF */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* D0-DF */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* E0-EF */
+    			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1   /* F0-FF */
 			};
 		const char* cur = base64Text;
 		uint64_t bufferIdx = 0;
