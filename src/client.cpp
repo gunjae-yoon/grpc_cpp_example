@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <base64.h>
 #include <fstream>
+#include <chrono>
 
 ABSL_FLAG(std::string, target, "localhost:50501", "Server Address");
 ABSL_FLAG(std::string, filename, "client", "Filename to request");
@@ -53,6 +54,13 @@ namespace grpc_cpp_example {
 			}
 			
 			if (status.ok()) {
+				// pure bytestream
+				std::ofstream stream;
+				stream.open("output", std::ios::out | std::ios::binary);
+				stream.write(response.data().c_str(), response.data().length());
+				stream.close();
+				/*
+				// BASE64
 				std::string base64 = response.data();
 				if (base64.length() > 0) {
 					uint64_t originLength = GetOriginalLengthOfBase64(base64);
@@ -65,6 +73,7 @@ namespace grpc_cpp_example {
 					stream.close();
 					delete(buffer);
 				}
+				*/
 				
 				return response.stat();
 			} else {

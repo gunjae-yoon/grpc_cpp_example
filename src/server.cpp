@@ -10,6 +10,8 @@
 #include <iostream>
 #include <filesystem>
 #include <string>
+#include <chrono>
+#include <fstream>
 
 ABSL_FLAG(uint16_t, port, 50501, "Server port for grpc_cpp_example");
 
@@ -29,9 +31,24 @@ namespace grpc_cpp_example {
 				) override {
 			std::cout << "GetFile: " << request->name() << std::endl;
 			if (std::filesystem::exists(request->name())) {
+				// pure bytestream
+				std::string filepath = request->name();
+     				uint64_t filesize = std::filesystem::file_size(filepath);
+     				std::ifstream stream(filepath, std::ifstream::binary);
+     				if (stream) {
+     				        char* buffer = new char[filesize];
+     				        stream.read(buffer, filesize);
+     				        stream.close();
+					std::string content(buffer, filesize);
+					reply->set_data(content);
+				}
+				reply->set_stat(OK);
+				/*
+				// BASE64
 				std::string base64 = ReadFileAsBase64(request->name());
 				reply->set_stat(OK);
 				reply->set_data(base64);
+				*/
 			} else {
 				reply->set_stat(DOES_NOT_EXIST);
 				reply->set_data("empty");

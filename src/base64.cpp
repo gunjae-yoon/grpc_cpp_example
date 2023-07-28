@@ -163,6 +163,7 @@ namespace grpc_cpp_example {
 			mem[memIdx++] = ('=');
 			mem[memIdx++] = ('=');
 		}
+		mem[memIdx] = 0; // end of string
 		
 		std::string result(mem);
 		delete(mem);
@@ -198,7 +199,7 @@ namespace grpc_cpp_example {
 		char digitOld = 0;
 		char digitCur = -1;
 
-		while (*(cur) != '/0') {
+		while (*(cur) != 0) {
 			digitCur = base64DecodingTable[*(cur)];
 			if (digitCur != -1) {
 				switch (phase) {
